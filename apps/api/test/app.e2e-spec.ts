@@ -490,6 +490,40 @@ describe('PersonalPro API (e2e)', () => {
       expect(res.body.data.student.sessions).toHaveLength(2);
     });
 
+    it('exclusão da conta do professor preserva o histórico dos alunos', async () => {
+      const t = await register('TRAINER', 'saindo@e2e.com');
+      const code = (await http.get('/trainers/me').set(auth(t.accessToken))).body.inviteCode;
+      const s = await register('STUDENT', 'fica@e2e.com', { inviteCode: code });
+      const custom = await http
+        .post('/exercises')
+        .set(auth(t.accessToken))
+        .send({ name: 'Remada exclusiva', muscleGroup: 'BACK' })
+        .expect(201);
+      const w = await http
+        .post('/workouts')
+        .set(auth(t.accessToken))
+        .send({ name: 'Treino X', exercises: [{ exerciseId: custom.body.id, sets: 1, reps: '10' }] })
+        .expect(201);
+      await http.post(`/workouts/${w.body.id}/assign`).set(auth(t.accessToken)).send({ studentId: s.user.studentId }).expect(201);
+      const session = await http.post('/sessions').set(auth(s.accessToken)).send({ workoutId: w.body.id }).expect(201);
+      await http
+        .post(`/sessions/${session.body.id}/sets`)
+        .set(auth(s.accessToken))
+        .send({ exerciseId: custom.body.id, setNumber: 1, loadKg: 40, reps: 10 })
+        .expect(201);
+      await http.post(`/sessions/${session.body.id}/finish`).set(auth(s.accessToken)).send({}).expect(201);
+
+      await http.delete('/account').set(auth(t.accessToken)).send({ password: PASSWORD }).expect(204);
+
+      const history = await http.get('/sessions').set(auth(s.accessToken)).expect(200);
+      expect(history.body.total).toBe(1);
+      const progress = await http.get('/progress/exercises').set(auth(s.accessToken)).expect(200);
+      expect(progress.body[0].name).toBe('Remada exclusiva');
+      // O exercício arquivado não aparece na biblioteca de ninguém
+      const library = await http.get('/exercises?search=exclusiva').set(auth(otherTrainer.accessToken)).expect(200);
+      expect(library.body).toHaveLength(0);
+    });
+
     it('exclui a conta com confirmação de senha', async () => {
       await http.delete('/account').set(auth(student.accessToken)).send({ password: 'errada' }).expect(401);
       await http.delete('/account').set(auth(student.accessToken)).send({ password: 'NovaSenha123' }).expect(204);

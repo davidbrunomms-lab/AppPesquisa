@@ -469,7 +469,7 @@ model TrainerReview {
 // Exercícios e treinos
 // ----------------------------------------------------------------------------
 
-/// trainer_id NULL = biblioteca global da plataforma; preenchido = exercício
+/// trainer_id NULL (e archived_at NULL) = biblioteca global da plataforma; preenchido = exercício
 /// personalizado visível apenas para aquele professor e seus alunos.
 model Exercise {
   id             String      @id @default(uuid()) @db.Uuid
@@ -482,6 +482,9 @@ model Exercise {
   videoUrl       String?     @map("video_url")
   instructions   String[]    @default([])
   commonMistakes String[]    @default([]) @map("common_mistakes")
+  /// Exercício personalizado de professor que excluiu a conta, mantido apenas
+  /// para preservar o histórico dos alunos (não aparece na biblioteca).
+  archivedAt     DateTime?   @map("archived_at")
   createdAt      DateTime    @default(now()) @map("created_at")
   updatedAt      DateTime    @updatedAt @map("updated_at")
 

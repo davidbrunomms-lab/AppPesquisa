@@ -23,15 +23,15 @@ export class ExercisesService {
   }
 
   async visibilityFilter(user: AuthUser): Promise<Prisma.ExerciseWhereInput> {
-    return { OR: [{ trainerId: null }, { trainerId: { in: await this.visibleTrainerIds(user) } }] };
+    return { archivedAt: null, OR: [{ trainerId: null }, { trainerId: { in: await this.visibleTrainerIds(user) } }] };
   }
 
   async list(user: AuthUser, q: ListExercisesQuery) {
     const scope: Prisma.ExerciseWhereInput =
       q.scope === 'library'
-        ? { trainerId: null }
+        ? { trainerId: null, archivedAt: null }
         : q.scope === 'custom'
-          ? { trainerId: { in: await this.visibleTrainerIds(user) } }
+          ? { trainerId: { in: await this.visibleTrainerIds(user) }, archivedAt: null }
           : await this.visibilityFilter(user);
     return this.prisma.exercise.findMany({
       where: {
@@ -55,7 +55,7 @@ export class ExercisesService {
   async assertUsable(trainerId: string, ids: string[]) {
     const unique = [...new Set(ids)];
     const count = await this.prisma.exercise.count({
-      where: { id: { in: unique }, OR: [{ trainerId: null }, { trainerId }] },
+      where: { id: { in: unique }, archivedAt: null, OR: [{ trainerId: null }, { trainerId }] },
     });
     if (count !== unique.length) throw new NotFoundError('Exercício');
   }

@@ -4751,7 +4751,7 @@
           },
           "attachmentUrl": {
             "type": "string",
-            "description": "URL retornada por POST /files"
+            "description": "URL (ou storedUrl) retornada por POST /files"
           },
           "attachmentName": {
             "type": "string"

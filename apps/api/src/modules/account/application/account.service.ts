@@ -109,11 +109,19 @@ export class AccountService {
 
     await this.prisma.$transaction(async (tx) => {
       if (user.trainer) {
+        const trainerId = user.trainer.id;
         await tx.trainerStudent.updateMany({
-          where: { trainerId: user.trainer.id },
+          where: { trainerId },
           data: { status: LinkStatus.INACTIVE, endedAt: new Date() },
         });
-        await tx.trainer.delete({ where: { id: user.trainer.id } });
+        // Fichas saem primeiro (os itens referenciam exercícios com RESTRICT)
+        await tx.workout.deleteMany({ where: { trainerId } });
+        // Exercícios personalizados já executados por alunos são arquivados para preservar o histórico deles
+        await tx.exercise.updateMany({
+          where: { trainerId, sets: { some: {} } },
+          data: { trainerId: null, archivedAt: new Date() },
+        });
+        await tx.trainer.delete({ where: { id: trainerId } });
       }
       if (user.student) await tx.student.delete({ where: { id: user.student.id } });
       await tx.authIdentity.deleteMany({ where: { userId } });

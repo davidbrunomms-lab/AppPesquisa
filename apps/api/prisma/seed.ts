@@ -28,7 +28,7 @@ async function seedPlans() {
 
 async function seedExercises() {
   for (const ex of EXERCISE_LIBRARY) {
-    const existing = await prisma.exercise.findFirst({ where: { name: ex.name, trainerId: null } });
+    const existing = await prisma.exercise.findFirst({ where: { name: ex.name, trainerId: null, archivedAt: null } });
     if (existing) await prisma.exercise.update({ where: { id: existing.id }, data: ex });
     else await prisma.exercise.create({ data: ex });
   }
@@ -53,7 +53,7 @@ async function seedAdmin() {
   console.log(`✔ admin: ${email}`);
 }
 
-const ex = async (name: string) => (await prisma.exercise.findFirstOrThrow({ where: { name, trainerId: null } })).id;
+const ex = async (name: string) => (await prisma.exercise.findFirstOrThrow({ where: { name, trainerId: null, archivedAt: null } })).id;
 
 async function seedDemo() {
   const password = await hash('Demo12345', 12);
