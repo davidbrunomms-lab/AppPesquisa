@@ -309,6 +309,15 @@ describe('PersonalPro API (e2e)', () => {
         .attach('file', png, { filename: 'frente.png', contentType: 'image/png' })
         .expect(201);
       expect(res.body.photos[0].angle).toBe('FRONT');
+
+      // Foto é dado sensível: só acessível por URL assinada e temporária
+      const signed = new URL(res.body.photos[0].url);
+      expect(signed.pathname).toMatch(/^\/files\/private\//);
+      const ok = await http.get(`${signed.pathname}${signed.search}`).expect(200);
+      expect(ok.headers['content-type']).toContain('image/png');
+      await http.get(`${signed.pathname}?exp=${signed.searchParams.get('exp')}&sig=adulterada`).expect(404);
+      const key = decodeURIComponent(signed.pathname.replace('/files/private/', ''));
+      await http.get(`/uploads/${key}`).expect(404);
     });
 
     it('aluno não altera avaliação registrada pelo professor', async () => {
@@ -375,9 +384,18 @@ describe('PersonalPro API (e2e)', () => {
       expect(conv.unreadCount).toBe(1);
 
       await http.post(`/conversations/${conversationId}/messages`).set(auth(trainer.accessToken)).send({ content: 'Pode sim!' }).expect(201);
+      const doc = await http
+        .post(`/conversations/${conversationId}/attachments`)
+        .set(auth(trainer.accessToken))
+        .attach('file', Buffer.from('treino em pdf'), { filename: 'treino.txt', contentType: 'text/plain' })
+        .expect(201);
+      expect(doc.body.type).toBe('FILE');
+      expect(doc.body.attachmentUrl).toContain('/files/private/');
+      const stored = await prisma.message.findUniqueOrThrow({ where: { id: doc.body.id } });
+      expect(stored.attachmentUrl).toMatch(/^private:\/\//);
       await http.post(`/conversations/${conversationId}/read`).set(auth(trainer.accessToken)).expect(201);
       const msgs = await http.get(`/conversations/${conversationId}/messages`).set(auth(student.accessToken)).expect(200);
-      expect(msgs.body).toHaveLength(2);
+      expect(msgs.body).toHaveLength(3);
       await http.get(`/conversations/${conversationId}/messages`).set(auth(otherTrainer.accessToken)).expect(404);
     });
 

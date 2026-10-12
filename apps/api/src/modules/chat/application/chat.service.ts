@@ -28,6 +28,12 @@ const PREVIEW: Record<MessageType, string> = {
 const typeFromMime = (mime: string): MessageType =>
   mime.startsWith('image/') ? MessageType.IMAGE : mime.startsWith('video/') ? MessageType.VIDEO : mime.startsWith('audio/') ? MessageType.AUDIO : MessageType.FILE;
 
+/** Converte uma URL assinada local (/files/private/<chave>?...) de volta para a referência privada. */
+const toStoredRef = (url?: string) => {
+  const match = url?.match(/\/files\/private\/([^?]+)\?/);
+  return match ? `private://${decodeURIComponent(match[1])}` : url;
+};
+
 const linkInclude = {
   trainer: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
   student: { include: { user: { select: { id: true, name: true, avatarUrl: true } } } },
@@ -57,19 +63,25 @@ export class ChatService {
       where: { trainerStudentId: { in: links.map((l) => l.id) }, senderId: { not: user.userId }, readAt: null },
       _count: true,
     });
+    const presented = await Promise.all(links.map(async (l) => (l.messages[0] ? this.present(l.messages[0]) : null)));
     return links
-      .map((l) => {
+      .map((l, i) => {
         const other = user.role === 'TRAINER' ? l.student.user : l.trainer.user;
         return {
           id: l.id,
           trainerId: l.trainerId,
           studentId: l.studentId,
           participant: { userId: other.id, name: other.name, avatarUrl: other.avatarUrl },
-          lastMessage: l.messages[0] ?? null,
+          lastMessage: presented[i],
           unreadCount: unread.find((u) => u.trainerStudentId === l.id)?._count ?? 0,
         };
       })
       .sort((a, b) => (b.lastMessage?.createdAt.getTime() ?? 0) - (a.lastMessage?.createdAt.getTime() ?? 0));
+  }
+
+  /** Anexos privados são entregues com URL assinada e temporária. */
+  private async present<T extends { attachmentUrl: string | null }>(message: T): Promise<T> {
+    return { ...message, attachmentUrl: await this.files.resolveUrl(message.attachmentUrl) };
   }
 
   async messages(user: AuthUser, conversationId: string, before?: string, limit = 30) {
@@ -79,7 +91,7 @@ export class ChatService {
       orderBy: { createdAt: 'desc' },
       take: Math.min(limit, 100),
     });
-    return items.reverse();
+    return Promise.all(items.reverse().map((m) => this.present(m)));
   }
 
   async send(user: AuthUser, conversationId: string, input: SendMessageInput) {
@@ -94,13 +106,13 @@ export class ChatService {
         senderId: user.userId,
         type: input.type,
         content: input.content?.trim(),
-        attachmentUrl: input.attachmentUrl,
+        attachmentUrl: toStoredRef(input.attachmentUrl),
         attachmentName: input.attachmentName,
         attachmentMime: input.attachmentMime,
         isQuestion: input.isQuestion ?? false,
       },
       include: { sender: { select: { name: true } } },
-    });
+    }).then((m) => this.present(m));
     this.gateway.emitMessage(conversationId, message);
 
     const full = await this.prisma.trainerStudent.findUniqueOrThrow({ where: { id: conversationId }, include: linkInclude });
@@ -122,7 +134,7 @@ export class ChatService {
     return this.send(user, conversationId, {
       type: typeFromMime(stored.mimeType),
       content,
-      attachmentUrl: stored.url,
+      attachmentUrl: stored.storedUrl,
       attachmentName: file?.originalname,
       attachmentMime: stored.mimeType,
     });

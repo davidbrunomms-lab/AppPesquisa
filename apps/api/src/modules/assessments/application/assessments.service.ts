@@ -29,7 +29,7 @@ export class AssessmentsService {
     private readonly notifications: NotificationsService,
   ) {}
 
-  serialize(a: AssessmentFull) {
+  async serialize(a: AssessmentFull) {
     const measurements = a.measurements
       ? Object.fromEntries(BODY_MEASUREMENT_KEYS.map((k) => [k, num(a.measurements![k])]))
       : null;
@@ -49,7 +49,8 @@ export class AssessmentsService {
       visceralFat: num(a.visceralFat),
       notes: a.notes,
       measurements,
-      photos: a.photos.map((p) => ({ id: p.id, angle: p.angle, url: p.url })),
+      // Fotos de evolução são dados sensíveis: URL assinada e temporária
+      photos: await Promise.all(a.photos.map(async (p) => ({ id: p.id, angle: p.angle, url: (await this.files.resolveUrl(p.url))! }))),
     };
   }
 
@@ -134,7 +135,7 @@ export class AssessmentsService {
       include,
       orderBy: [{ assessedAt: { sort: 'desc', nulls: 'first' } }, { scheduledFor: 'desc' }],
     });
-    return items.map((a) => this.serialize(a));
+    return Promise.all(items.map((a) => this.serialize(a)));
   }
 
   async get(user: AuthUser, id: string) {
@@ -152,8 +153,8 @@ export class AssessmentsService {
     const stored = await this.files.upload(user.userId, file, 'progress', /^image\//);
     await this.prisma.progressPhoto.upsert({
       where: { assessmentId_angle: { assessmentId: id, angle } },
-      create: { assessmentId: id, studentId: assessment.studentId, angle, url: stored.url },
-      update: { url: stored.url },
+      create: { assessmentId: id, studentId: assessment.studentId, angle, url: stored.storedUrl },
+      update: { url: stored.storedUrl },
     });
     return this.get(user, id);
   }
@@ -162,8 +163,7 @@ export class AssessmentsService {
   async compare(user: AuthUser, beforeId: string, afterId: string) {
     const [before, after] = await Promise.all([this.getOwned(user, beforeId, false), this.getOwned(user, afterId, false)]);
     if (before.studentId !== after.studentId) throw new ForbiddenError('As avaliações devem ser do mesmo aluno');
-    const a = this.serialize(before);
-    const b = this.serialize(after);
+    const [a, b] = await Promise.all([this.serialize(before), this.serialize(after)]);
     const diff = (x: number | null, y: number | null) => (x !== null && y !== null ? round(y - x, 1) : null);
     return {
       before: a,

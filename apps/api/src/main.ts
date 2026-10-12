@@ -7,6 +7,7 @@ import helmet from 'helmet';
 import { resolve } from 'node:path';
 import { AppModule } from './app.module';
 import { AppConfig } from './config/app-config';
+import { PUBLIC_FOLDERS } from './modules/files/application/files.service';
 
 export function configureApp(app: NestExpressApplication) {
   const config = app.get(AppConfig);
@@ -17,7 +18,10 @@ export function configureApp(app: NestExpressApplication) {
   );
   app.useBodyParser('json', { limit: '2mb' });
   if (config.storage.driver === 'local') {
-    app.useStaticAssets(resolve(config.storage.localDir), { prefix: '/uploads', maxAge: '7d' });
+    // Somente pastas públicas são servidas estaticamente; as privadas exigem URL assinada
+    for (const folder of PUBLIC_FOLDERS) {
+      app.useStaticAssets(resolve(config.storage.localDir, folder), { prefix: `/uploads/${folder}`, maxAge: '7d' });
+    }
   }
   return config;
 }

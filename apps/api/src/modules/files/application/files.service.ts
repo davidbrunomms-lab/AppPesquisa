@@ -8,6 +8,12 @@ import { StoragePort } from '../../../infrastructure/storage/storage.port';
 export const FILE_FOLDERS = ['avatars', 'exercises', 'chat', 'progress', 'documents'] as const;
 export type FileFolder = (typeof FILE_FOLDERS)[number];
 
+/** Pastas com URL pública permanente. As demais são privadas (URL assinada e temporária). */
+export const PUBLIC_FOLDERS: FileFolder[] = ['avatars', 'exercises'];
+const PRIVATE_PREFIX = 'private://';
+/** Validade das URLs assinadas entregues aos clientes. */
+export const SIGNED_URL_TTL_SECONDS = 60 * 60;
+
 const MB = 1024 * 1024;
 const LIMITS: { pattern: RegExp; maxBytes: number }[] = [
   { pattern: /^image\/(jpeg|png|webp|heic|heif|gif)$/, maxBytes: 15 * MB },
@@ -47,9 +53,23 @@ export class FilesService {
     const ext = extname(file.originalname).toLowerCase().replace(/[^.a-z0-9]/g, '').slice(0, 8);
     const key = `${folder}/${ownerId}/${randomUUID()}${ext}`;
     const stored = await this.storage.put(key, file.buffer, file.mimetype);
-    return this.prisma.fileObject.create({
-      data: { ownerId, key: stored.key, url: stored.url, mimeType: file.mimetype, sizeBytes: file.size },
+    // Arquivos privados guardam uma referência (private://chave) resolvida em URL assinada na leitura
+    const url = PUBLIC_FOLDERS.includes(folder) ? stored.url : `${PRIVATE_PREFIX}${stored.key}`;
+    const saved = await this.prisma.fileObject.create({
+      data: { ownerId, key: stored.key, url, mimeType: file.mimetype, sizeBytes: file.size },
     });
+    return { ...saved, storedUrl: url, url: (await this.resolveUrl(url))! };
+  }
+
+  /** Converte referências privadas em URLs assinadas temporárias; URLs públicas passam direto. */
+  async resolveUrl(url: string | null | undefined): Promise<string | null> {
+    if (!url) return null;
+    if (!url.startsWith(PRIVATE_PREFIX)) return url;
+    return this.storage.signedUrl(url.slice(PRIVATE_PREFIX.length), SIGNED_URL_TTL_SECONDS);
+  }
+
+  findByKey(key: string) {
+    return this.prisma.fileObject.findUnique({ where: { key } });
   }
 
   /** Remove do storage todos os arquivos do usuário (exclusão de conta). */

@@ -3,7 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ApiBearerAuth, ApiBody, ApiConsumes, ApiProperty, ApiPropertyOptional, ApiTags } from '@nestjs/swagger';
 import { MessageType } from '@prisma/client';
 import { Type } from 'class-transformer';
-import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, IsUrl, Length, Max, MaxLength, Min } from 'class-validator';
+import { IsBoolean, IsDateString, IsEnum, IsInt, IsOptional, IsString, Length, Matches, Max, MaxLength, Min } from 'class-validator';
 import type { AuthUser } from '../../../common/auth/auth-user';
 import { CurrentUser, Roles } from '../../../common/auth/decorators';
 import { ChatService } from '../application/chat.service';
@@ -15,7 +15,10 @@ class SendMessageDto {
   type: MessageType = MessageType.TEXT;
 
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(4000) content?: string;
-  @ApiPropertyOptional({ description: 'URL retornada por POST /files' }) @IsOptional() @IsUrl({ require_tld: false }) attachmentUrl?: string;
+  @ApiPropertyOptional({ description: 'URL (ou storedUrl) retornada por POST /files' })
+  @IsOptional()
+  @Matches(/^(https?:\/\/|private:\/\/)\S+$/, { message: 'attachmentUrl inválida' })
+  attachmentUrl?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(200) attachmentName?: string;
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(100) attachmentMime?: string;
   @ApiPropertyOptional() @IsOptional() @IsBoolean() isQuestion?: boolean;
