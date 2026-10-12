@@ -1584,6 +1584,25 @@
         ]
       }
     },
+    "/sessions/active": {
+      "get": {
+        "operationId": "SessionsController_active",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": ""
+          }
+        },
+        "security": [
+          {
+            "bearer": []
+          }
+        ],
+        "tags": [
+          "Execução de treino"
+        ]
+      }
+    },
     "/sessions/{id}": {
       "get": {
         "operationId": "SessionsController_get",
@@ -4251,9 +4270,6 @@
       "CreateStudentDto": {
         "type": "object",
         "properties": {
-          "name": {
-            "type": "string"
-          },
           "phone": {
             "type": "string"
           },
@@ -4317,6 +4333,9 @@
           "gymCity": {
             "type": "string"
           },
+          "name": {
+            "type": "string"
+          },
           "email": {
             "type": "string"
           },
@@ -4326,6 +4345,7 @@
           }
         },
         "required": [
+          "name",
           "email"
         ]
       },

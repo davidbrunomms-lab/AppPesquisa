@@ -88,7 +88,7 @@ export class ChatService {
     await this.access.assertConversationMember(user, conversationId);
     const items = await this.prisma.message.findMany({
       where: { trainerStudentId: conversationId, ...(before ? { createdAt: { lt: new Date(before) } } : {}) },
-      orderBy: { createdAt: 'desc' },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
       take: Math.min(limit, 100),
     });
     return Promise.all(items.reverse().map((m) => this.present(m)));

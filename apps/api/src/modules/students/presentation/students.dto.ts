@@ -1,4 +1,4 @@
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional, OmitType } from '@nestjs/swagger';
 import { LinkStatus, Sex, TrainingGoal, TrainingLevel } from '@prisma/client';
 import { Transform, Type } from 'class-transformer';
 import {
@@ -33,8 +33,8 @@ export class StudentProfileDto {
   @ApiPropertyOptional() @IsOptional() @IsString() @MaxLength(80) gymCity?: string;
 }
 
-export class CreateStudentDto extends StudentProfileDto {
-  @ApiProperty() @IsString() @Length(2, 120) declare name: string;
+export class CreateStudentDto extends OmitType(StudentProfileDto, ['name'] as const) {
+  @ApiProperty() @IsString() @Length(2, 120) name: string;
   @ApiProperty() @IsEmail() email: string;
   @ApiPropertyOptional({ description: 'Início do acompanhamento' }) @IsOptional() @IsDateString() startedAt?: string;
 }

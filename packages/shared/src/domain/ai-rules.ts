@@ -86,10 +86,15 @@ export function detectLowFrequency(params: {
 }): SuggestionDraft | null {
   const rate = attendanceRate(params.sessionsLastTwoWeeks, params.plannedPerWeek, 2);
   if (rate >= 50) return null;
+  const d = params.daysSinceLastWorkout;
   const since =
-    params.daysSinceLastWorkout === null
+    d === null
       ? 'ainda não registrou treinos'
-      : `está há ${params.daysSinceLastWorkout} dias sem treinar`;
+      : d === 0
+        ? 'treinou hoje'
+        : d === 1
+          ? 'treinou pela última vez ontem'
+          : `está há ${d} dias sem treinar`;
   return {
     type: AiSuggestionType.LOW_FREQUENCY,
     title: `Baixa frequência: ${params.studentName}`,

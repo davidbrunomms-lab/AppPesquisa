@@ -9,6 +9,13 @@ import { PrismaService } from '../../../infrastructure/prisma/prisma.service';
 import { NotificationsService } from '../../notifications/application/notifications.service';
 import { SubscriptionsService } from '../../subscriptions/application/subscriptions.service';
 
+/** Telefone em formato E.164 sem "+" (wa.me exige DDI). Números brasileiros sem DDI recebem 55. */
+export function normalizePhone(raw?: string): string | undefined {
+  const digits = raw?.replace(/\D/g, '');
+  if (!digits) return undefined;
+  return digits.length === 10 || digits.length === 11 ? `55${digits}` : digits;
+}
+
 export interface CreateInviteInput {
   channel: InviteChannel;
   name?: string;
@@ -44,7 +51,7 @@ export class InvitesService {
         channel: input.channel,
         name: input.name,
         email: input.email?.toLowerCase(),
-        phone: input.phone?.replace(/\D/g, ''),
+        phone: normalizePhone(input.phone),
         expiresAt: addDays(new Date(), input.expiresInDays ?? 7),
       },
     });

@@ -50,6 +50,15 @@ export class SessionsService {
     return this.executionView(session.id);
   }
 
+  /** Treino em andamento (para o botão "Retomar treino"); null se não houver. */
+  async active(studentId: string) {
+    const open = await this.prisma.workoutSession.findFirst({
+      where: { studentId, status: SessionStatus.IN_PROGRESS, startedAt: { gte: new Date(Date.now() - STALE_SESSION_MS) } },
+      orderBy: { startedAt: 'desc' },
+    });
+    return open ? this.executionView(open.id) : null;
+  }
+
   async get(user: AuthUser, id: string) {
     const session = await this.prisma.workoutSession.findUnique({ where: { id } });
     if (!session) throw new NotFoundError('Sessão');

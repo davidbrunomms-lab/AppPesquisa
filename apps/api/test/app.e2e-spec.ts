@@ -131,6 +131,10 @@ describe('PersonalPro API (e2e)', () => {
   });
 
   describe('Cadastro manual e convites', () => {
+    it('nome é obrigatório no cadastro manual', async () => {
+      await http.post('/students').set(auth(trainer.accessToken)).send({ email: 'semnome@e2e.com' }).expect(400);
+    });
+
     it('cadastra aluno manualmente', async () => {
       const res = await http
         .post('/students')
@@ -145,7 +149,7 @@ describe('PersonalPro API (e2e)', () => {
       const res = await http
         .post('/invites')
         .set(auth(trainer.accessToken))
-        .send({ channel: 'WHATSAPP', phone: '+55 (11) 98888-7777', name: 'Pedro' })
+        .send({ channel: 'WHATSAPP', phone: '(11) 98888-7777', name: 'Pedro' })
         .expect(201);
       expect(res.body.whatsappUrl).toContain('https://wa.me/5511988887777');
       const preview = await http.get(`/invites/${res.body.invite.code}/preview`).expect(200);
@@ -193,6 +197,8 @@ describe('PersonalPro API (e2e)', () => {
 
     const runSession = async (load: number) => {
       const start = await http.post('/sessions').set(auth(student.accessToken)).send({ workoutId }).expect(201);
+      const active = await http.get('/sessions/active').set(auth(student.accessToken)).expect(200);
+      expect(active.body.id).toBe(start.body.id);
       let pr = false;
       for (let set = 1; set <= 3; set++) {
         const res = await http

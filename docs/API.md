@@ -45,13 +45,21 @@ Socket.IO no namespace `/chat`:
 ```ts
 const socket = io(`${API_URL}/chat`, { auth: { token: accessToken } });
 socket.on('message', (m: Message) => {});      // nova mensagem em qualquer conversa do usuário
-socket.on('read', ({ conversationId }) => {});  // mensagens lidas pelo outro participante
+socket.on('read', ({ conversationId, readerId }) => {}); // emitido para a sala toda: ignore quando readerId for o próprio usuário
 socket.emit('typing', { conversationId });       // → 'typing' para o outro participante
 ```
 
+## Mensagens
+
+`GET /conversations/:id/messages` retorna em ordem cronológica (mais antiga → mais recente), as últimas `limit` mensagens; use `before=<createdAt da mais antiga>` para paginar.
+
+## Arquivos privados
+
+Fotos de evolução, anexos do chat e documentos chegam com URL assinada válida por ~1 hora (`/files/private/...?exp=&sig=` ou presigned S3). Não faça cache dessas URLs: recarregue o recurso para obter uma nova.
+
 ## Fluxo de execução de treino
 
-1. `GET /workouts/today` → treino do dia.
+1. `GET /workouts/today` → treino do dia. `GET /sessions/active` → treino em andamento para retomar (ou `null`).
 2. `POST /sessions { workoutId }` → tela de execução: por exercício, prescrição, mídia, `previous` (carga utilizada anteriormente), `personalBest` e `today`.
 3. A cada série: `POST /sessions/:id/sets { exerciseId, workoutExerciseId, setNumber, loadKg, reps, rpe?, notes? }` → `{ isPersonalRecord, restSeconds }` → o app inicia o cronômetro de descanso (botão **PULAR DESCANSO**).
 4. `POST /sessions/:id/finish { perceivedEffort?, notes? }` → resumo (início, fim, duração, volume total, calorias, recordes).

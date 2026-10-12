@@ -25,6 +25,13 @@ export class SessionsController {
     return this.sessions.history(user, q);
   }
 
+  /** Treino em andamento do aluno (ou null). */
+  @Roles('STUDENT')
+  @Get('active')
+  active(@CurrentUser() user: AuthUser) {
+    return this.sessions.active(user.studentId!);
+  }
+
   @Roles('STUDENT', 'TRAINER')
   @Get(':id')
   get(@CurrentUser() user: AuthUser, @Param('id', ParseUUIDPipe) id: string) {

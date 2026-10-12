@@ -79,8 +79,8 @@ Plataforma SaaS para personal trainers e alunos de academia, disponível em **iO
 │   │   └── src/
 │   │       ├── app/                 # Rotas (Expo Router)
 │   │       │   ├── (auth)/          # Login, cadastro, recuperação de senha
-│   │       │   ├── (student)/       # Abas do aluno: Início, Treinos, Evolução, Agenda, Perfil
-│   │       │   └── (trainer)/       # Abas do professor: Dashboard, Alunos, Treinos, Agenda, Perfil
+│   │       │   ├── aluno/(tabs)/    # Abas do aluno: Início, Treinos, Evolução, Agenda, Perfil
+│   │       │   └── professor/(tabs)/ # Abas do professor: Dashboard, Alunos, Treinos, Agenda, Perfil
 │   │       ├── components/          # UI (cards, gráficos, inputs, cronômetro…)
 │   │       ├── features/            # Hooks e lógica por domínio
 │   │       ├── lib/                 # Cliente HTTP, sessão, storage seguro
