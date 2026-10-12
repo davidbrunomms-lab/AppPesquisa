@@ -29,6 +29,7 @@
 ## Validação e uploads
 
 - DTOs com `class-validator` (`whitelist` + `forbidNonWhitelisted`): campos desconhecidos são rejeitados.
+- **Arquivos sensíveis** (fotos de evolução, anexos do chat, documentos) não têm URL pública: são guardados como referência privada e entregues com **URL assinada válida por 1 hora** (HMAC no driver local; *presigned URL* no S3). Somente avatares e mídias de exercícios são públicos.
 - Uploads: lista de MIME types permitidos e limites por tipo (imagem 15 MB, áudio 25 MB, documento 25 MB, vídeo 150 MB); chaves aleatórias (UUID) por usuário; proteção contra *path traversal* no driver local.
 - Webhooks de pagamento autenticados (assinatura HMAC Stripe com tolerância de 5 min; token Asaas com comparação em tempo constante; Mercado Pago revalidado consultando a API).
 
@@ -52,6 +53,6 @@
 - [ ] `NODE_ENV=production`, `JWT_ACCESS_SECRET` (≥ 32 caracteres) e `DATA_ENCRYPTION_KEY` (32 bytes base64) gerados aleatoriamente e guardados em cofre de segredos.
 - [ ] `CORS_ORIGINS` restrito aos domínios do app/web.
 - [ ] HTTPS em todos os domínios; HSTS no balanceador.
-- [ ] Bucket S3/Supabase privado com URLs públicas apenas para mídias de exercícios, ou CDN com URLs assinadas para fotos de evolução.
+- [ ] Bucket S3/Supabase **privado**, com leitura pública liberada apenas para os prefixos `avatars/` e `exercises/` (os demais usam URL assinada).
 - [ ] Backups do PostgreSQL criptografados e testados.
 - [ ] Rotação periódica de segredos e monitoramento de `audit_logs`.
