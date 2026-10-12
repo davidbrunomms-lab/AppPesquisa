@@ -11,6 +11,24 @@ import { DomainErrorFilter } from './common/errors/domain-error.filter';
 import { ConfigModule } from './config/config.module';
 import { InfrastructureModule } from './infrastructure/infrastructure.module';
 import { PrismaModule } from './infrastructure/prisma/prisma.module';
+import { AccountModule } from './modules/account/account.module';
+import { AssessmentsModule } from './modules/assessments/assessments.module';
+import { ExercisesModule } from './modules/exercises/exercises.module';
+import { FilesModule } from './modules/files/files.module';
+import { GoalsModule } from './modules/goals/goals.module';
+import { ProgressModule } from './modules/progress/progress.module';
+import { SessionsModule } from './modules/sessions/sessions.module';
+import { StudentsModule } from './modules/students/students.module';
+import { TrainersModule } from './modules/trainers/trainers.module';
+import { WorkoutsModule } from './modules/workouts/workouts.module';
+import { AdminModule } from './modules/admin/admin.module';
+import { AiModule } from './modules/ai/ai.module';
+import { ChatModule } from './modules/chat/chat.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+import { JobsModule } from './modules/jobs/jobs.module';
+import { NotesModule } from './modules/notes/notes.module';
+import { ReportsModule } from './modules/reports/reports.module';
+import { AgendaModule } from './modules/schedule/agenda.module';
 import { AuthModule } from './modules/auth/auth.module';
 import { InvitesModule } from './modules/invites/invites.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -30,6 +48,24 @@ import { SubscriptionsModule } from './modules/subscriptions/subscriptions.modul
     SubscriptionsModule,
     InvitesModule,
     AuthModule,
+    AccountModule,
+    AssessmentsModule,
+    ExercisesModule,
+    FilesModule,
+    GoalsModule,
+    ProgressModule,
+    SessionsModule,
+    StudentsModule,
+    TrainersModule,
+    WorkoutsModule,
+    AdminModule,
+    AiModule,
+    ChatModule,
+    DashboardModule,
+    JobsModule,
+    NotesModule,
+    ReportsModule,
+    AgendaModule,
   ],
   providers: [
     // Ordem: rate limit → autenticação JWT → autorização por perfil
