@@ -1,0 +1,52 @@
+/* Ajustes exclusivos da demo estática (somados a src/app/globals.css). */
+
+html,
+body {
+  background-color: var(--bg);
+  color: var(--fg);
+  margin: 0;
+}
+
+/* Nunca rolar na horizontal (largura mínima de 320–390 px no celular). */
+body {
+  overflow-x: clip;
+  min-height: 100dvh;
+}
+
+#root {
+  min-height: 100dvh;
+}
+
+.demo-banner {
+  padding-top: max(0.625rem, env(safe-area-inset-top));
+  padding-left: max(1rem, env(safe-area-inset-left));
+  padding-right: max(1rem, env(safe-area-inset-right));
+}
+
+/* Chip "Demo" recolhido: acima da navegação inferior no celular; no canto da barra lateral no desktop. */
+.demo-chip {
+  bottom: calc(76px + env(safe-area-inset-bottom));
+  right: max(0.75rem, env(safe-area-inset-right));
+}
+@media (max-width: 1023.98px) {
+  .demo-chip--hide-mobile {
+    display: none;
+  }
+}
+@media (min-width: 1024px) {
+  .demo-chip {
+    right: auto;
+    left: 16px;
+    bottom: 96px;
+  }
+}
+
+/*
+ * Rede de segurança contra "grid blowout" em telas estreitas: alguns grids do app
+ * usam só "grid" (coluna implícita auto), e um filho com conteúdo nowrap alargava a
+ * página além de 390 px (ex.: aba Treinos do aluno). min-width: 0 deixa a coluna
+ * encolher até a largura da tela.
+ */
+main .grid > * {
+  min-width: 0;
+}

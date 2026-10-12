@@ -31,7 +31,7 @@ export function WorkoutsTab({ studentId }: { studentId: string }) {
   });
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[1fr_380px]">
+    <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1fr)_380px]">
       <div className="space-y-3">
         <div className="flex items-center justify-between">
           <p className="text-sm text-muted">{list.data?.length ?? 0} treino(s) atribuído(s)</p>
