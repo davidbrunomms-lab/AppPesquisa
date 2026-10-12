@@ -1,0 +1,919 @@
+// ============================================================================
+// PersonalPro — Schema do banco de dados (PostgreSQL + Prisma)
+//
+// Multi-tenant (SaaS): o "tenant" é o personal trainer. Todo dado de aluno é
+// acessado através do vínculo trainer_students, e a camada de aplicação aplica
+// o isolamento (ver docs/DATABASE.md e src/common/access/access-policy.service.ts).
+// Convenções: tabelas em snake_case (@@map), colunas em snake_case (@map),
+// medidas em kg / cm / segundos, valores monetários em centavos.
+// ============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ----------------------------------------------------------------------------
+// Enums
+// ----------------------------------------------------------------------------
+
+enum UserRole {
+  STUDENT
+  TRAINER
+  ADMIN
+}
+
+enum AuthProvider {
+  GOOGLE
+  APPLE
+}
+
+enum Sex {
+  MALE
+  FEMALE
+  OTHER
+}
+
+enum TrainingLevel {
+  BEGINNER
+  INTERMEDIATE
+  ADVANCED
+}
+
+enum TrainingGoal {
+  WEIGHT_LOSS
+  HYPERTROPHY
+  STRENGTH
+  DEFINITION
+  CONDITIONING
+  REHABILITATION
+  QUALITY_OF_LIFE
+  SPORTS_PREPARATION
+}
+
+enum LinkStatus {
+  PENDING
+  ACTIVE
+  INACTIVE
+}
+
+enum InviteChannel {
+  CODE
+  QR_CODE
+  EMAIL
+  WHATSAPP
+}
+
+enum MuscleGroup {
+  CHEST
+  BACK
+  SHOULDERS
+  BICEPS
+  TRICEPS
+  QUADRICEPS
+  HAMSTRINGS
+  GLUTES
+  CALVES
+  ABS
+  CARDIO
+  MOBILITY
+}
+
+enum TrainingTechnique {
+  NORMAL
+  DROP_SET
+  REST_PAUSE
+  BI_SET
+  TRI_SET
+  PYRAMID
+  SUPERSET
+  ISOMETRY
+  CLUSTER_SET
+}
+
+enum SessionStatus {
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+enum AssessmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELED
+}
+
+enum PhotoAngle {
+  FRONT
+  BACK
+  RIGHT
+  LEFT
+}
+
+enum GoalType {
+  BODY_WEIGHT
+  BODY_FAT
+  WEEKLY_FREQUENCY
+  EXERCISE_LOAD
+  CUSTOM
+}
+
+enum GoalStatus {
+  ACTIVE
+  ACHIEVED
+  CANCELED
+}
+
+enum AppointmentStatus {
+  AVAILABLE
+  REQUESTED
+  CONFIRMED
+  CANCELED
+  COMPLETED
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  VIDEO
+  AUDIO
+  FILE
+}
+
+enum NotificationType {
+  WORKOUT_REMINDER
+  WORKOUT_UPDATED
+  INACTIVITY
+  MILESTONE
+  PERSONAL_RECORD
+  APPOINTMENT
+  MESSAGE
+  ASSESSMENT
+  GOAL
+  AI_SUGGESTION
+  WEEKLY_REPORT
+  SYSTEM
+}
+
+enum DevicePlatform {
+  IOS
+  ANDROID
+  WEB
+}
+
+enum AiSuggestionType {
+  LOAD_PROGRESSION
+  LOW_FREQUENCY
+  STAGNATION
+  WORKOUT_ADJUSTMENT
+  WEEKLY_SUMMARY
+  RECOMMENDATION
+}
+
+enum AiSuggestionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  APPLIED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+}
+
+enum PaymentProvider {
+  MANUAL
+  STRIPE
+  MERCADO_PAGO
+  ASAAS
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+}
+
+enum BillingInterval {
+  MONTHLY
+  YEARLY
+}
+
+// ----------------------------------------------------------------------------
+// Identidade e autenticação
+// ----------------------------------------------------------------------------
+
+model User {
+  id                 String    @id @default(uuid()) @db.Uuid
+  email              String    @unique
+  passwordHash       String?   @map("password_hash")
+  role               UserRole
+  name               String
+  phone              String?
+  avatarUrl          String?   @map("avatar_url")
+  emailVerifiedAt    DateTime? @map("email_verified_at")
+  lastLoginAt        DateTime? @map("last_login_at")
+  termsAcceptedAt    DateTime? @map("terms_accepted_at")
+  privacyVersion     String?   @map("privacy_version")
+  marketingOptIn     Boolean   @default(false) @map("marketing_opt_in")
+  deletedAt          DateTime? @map("deleted_at")
+  createdAt          DateTime  @default(now()) @map("created_at")
+  updatedAt          DateTime  @updatedAt @map("updated_at")
+
+  trainer              Trainer?
+  student              Student?
+  identities           AuthIdentity[]
+  refreshTokens        RefreshToken[]
+  passwordResetTokens  PasswordResetToken[]
+  deviceTokens         DeviceToken[]
+  notifications        Notification[]
+  sentMessages         Message[]           @relation("MessageSender")
+  files                FileObject[]
+  auditLogs            AuditLog[]
+  requestedAppointments Appointment[]      @relation("AppointmentRequester")
+
+  @@index([role])
+  @@map("users")
+}
+
+model AuthIdentity {
+  id             String       @id @default(uuid()) @db.Uuid
+  userId         String       @map("user_id") @db.Uuid
+  provider       AuthProvider
+  providerUserId String       @map("provider_user_id")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerUserId])
+  @@map("auth_identities")
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  userAgent String?   @map("user_agent")
+  expiresAt DateTime  @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+model PasswordResetToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  tokenHash String    @unique @map("token_hash")
+  expiresAt DateTime  @map("expires_at")
+  usedAt    DateTime? @map("used_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("password_reset_tokens")
+}
+
+model DeviceToken {
+  id        String         @id @default(uuid()) @db.Uuid
+  userId    String         @map("user_id") @db.Uuid
+  token     String         @unique
+  platform  DevicePlatform
+  createdAt DateTime       @default(now()) @map("created_at")
+  updatedAt DateTime       @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("device_tokens")
+}
+
+// ----------------------------------------------------------------------------
+// Perfis
+// ----------------------------------------------------------------------------
+
+model Trainer {
+  id              String   @id @default(uuid()) @db.Uuid
+  userId          String   @unique @map("user_id") @db.Uuid
+  cref            String?
+  specialties     String[] @default([])
+  bio             String?
+  experienceYears Int?     @map("experience_years")
+  socialLinks     Json     @default("{}") @map("social_links")
+  inviteCode      String   @unique @map("invite_code")
+  ratingAvg       Decimal  @default(0) @map("rating_avg") @db.Decimal(3, 2)
+  ratingCount     Int      @default(0) @map("rating_count")
+  createdAt       DateTime @default(now()) @map("created_at")
+  updatedAt       DateTime @updatedAt @map("updated_at")
+
+  user          User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gyms          TrainerGym[]
+  availability  TrainerAvailability[]
+  students      TrainerStudent[]
+  invites       StudentInvite[]
+  exercises     Exercise[]
+  workouts      Workout[]
+  assessments   BodyAssessment[]
+  goals         StudentGoal[]
+  appointments  Appointment[]
+  notes         TrainerNote[]
+  aiSuggestions AiSuggestion[]
+  reports       WeeklyReport[]
+  reviews       TrainerReview[]
+  subscription  Subscription?
+
+  @@map("trainers")
+}
+
+model Gym {
+  id        String   @id @default(uuid()) @db.Uuid
+  name      String
+  address   String?
+  city      String?
+  state     String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  trainers TrainerGym[]
+  students Student[]
+
+  @@unique([name, city])
+  @@map("gyms")
+}
+
+model TrainerGym {
+  trainerId String @map("trainer_id") @db.Uuid
+  gymId     String @map("gym_id") @db.Uuid
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  gym     Gym     @relation(fields: [gymId], references: [id], onDelete: Cascade)
+
+  @@id([trainerId, gymId])
+  @@map("trainer_gyms")
+}
+
+/// Janela semanal de disponibilidade (weekday 0 = domingo; horários "HH:mm").
+model TrainerAvailability {
+  id        String @id @default(uuid()) @db.Uuid
+  trainerId String @map("trainer_id") @db.Uuid
+  weekday   Int
+  startTime String @map("start_time")
+  endTime   String @map("end_time")
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId, weekday])
+  @@map("trainer_availability")
+}
+
+model Student {
+  id              String         @id @default(uuid()) @db.Uuid
+  userId          String         @unique @map("user_id") @db.Uuid
+  birthDate       DateTime?      @map("birth_date") @db.Date
+  sex             Sex?
+  heightCm        Decimal?       @map("height_cm") @db.Decimal(5, 1)
+  initialWeightKg Decimal?       @map("initial_weight_kg") @db.Decimal(5, 1)
+  currentWeightKg Decimal?       @map("current_weight_kg") @db.Decimal(5, 1)
+  goal            TrainingGoal?
+  level           TrainingLevel  @default(BEGINNER)
+  weeklyFrequency Int            @default(3) @map("weekly_frequency")
+  gymId           String?        @map("gym_id") @db.Uuid
+  createdAt       DateTime       @default(now()) @map("created_at")
+  updatedAt       DateTime       @updatedAt @map("updated_at")
+
+  user        User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  gym         Gym?              @relation(fields: [gymId], references: [id], onDelete: SetNull)
+  trainers    TrainerStudent[]
+  workouts    StudentWorkout[]
+  sessions    WorkoutSession[]
+  assessments BodyAssessment[]
+  photos      ProgressPhoto[]
+  goals       StudentGoal[]
+  appointments Appointment[]
+  notes       TrainerNote[]
+  aiSuggestions AiSuggestion[]
+  reports     WeeklyReport[]
+  reviews     TrainerReview[]
+  invites     StudentInvite[]
+
+  @@map("students")
+}
+
+/// Vínculo professor ⇄ aluno. É a fronteira de isolamento multi-tenant e
+/// também a "conversa" do chat privado.
+model TrainerStudent {
+  id        String     @id @default(uuid()) @db.Uuid
+  trainerId String     @map("trainer_id") @db.Uuid
+  studentId String     @map("student_id") @db.Uuid
+  status    LinkStatus @default(ACTIVE)
+  startedAt DateTime   @default(now()) @map("started_at")
+  endedAt   DateTime?  @map("ended_at")
+  createdAt DateTime   @default(now()) @map("created_at")
+  updatedAt DateTime   @updatedAt @map("updated_at")
+
+  trainer  Trainer   @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@unique([trainerId, studentId])
+  @@index([studentId])
+  @@map("trainer_students")
+}
+
+model StudentInvite {
+  id         String        @id @default(uuid()) @db.Uuid
+  trainerId  String        @map("trainer_id") @db.Uuid
+  code       String        @unique
+  channel    InviteChannel
+  email      String?
+  phone      String?
+  name       String?
+  studentId  String?       @map("student_id") @db.Uuid
+  expiresAt  DateTime      @map("expires_at")
+  acceptedAt DateTime?     @map("accepted_at")
+  createdAt  DateTime      @default(now()) @map("created_at")
+
+  trainer Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  student Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+
+  @@index([trainerId])
+  @@map("student_invites")
+}
+
+model TrainerReview {
+  id        String   @id @default(uuid()) @db.Uuid
+  trainerId String   @map("trainer_id") @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  rating    Int
+  comment   String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([trainerId, studentId])
+  @@map("trainer_reviews")
+}
+
+// ----------------------------------------------------------------------------
+// Exercícios e treinos
+// ----------------------------------------------------------------------------
+
+/// trainer_id NULL = biblioteca global da plataforma; preenchido = exercício
+/// personalizado visível apenas para aquele professor e seus alunos.
+model Exercise {
+  id             String      @id @default(uuid()) @db.Uuid
+  trainerId      String?     @map("trainer_id") @db.Uuid
+  name           String
+  description    String?
+  muscleGroup    MuscleGroup @map("muscle_group")
+  equipment      String?
+  imageUrl       String?     @map("image_url")
+  videoUrl       String?     @map("video_url")
+  instructions   String[]    @default([])
+  commonMistakes String[]    @default([]) @map("common_mistakes")
+  createdAt      DateTime    @default(now()) @map("created_at")
+  updatedAt      DateTime    @updatedAt @map("updated_at")
+
+  trainer          Trainer?          @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  workoutExercises WorkoutExercise[]
+  sets             WorkoutSet[]
+  goals            StudentGoal[]
+
+  @@index([trainerId, muscleGroup])
+  @@index([name])
+  @@map("exercises")
+}
+
+/// Uma ficha de treino ("Treino A", "Push", "Full body"...). Pode ser modelo
+/// (is_template) e é atribuída a alunos via student_workouts.
+model Workout {
+  id          String   @id @default(uuid()) @db.Uuid
+  trainerId   String   @map("trainer_id") @db.Uuid
+  name        String
+  label       String?
+  description String?
+  isTemplate  Boolean  @default(false) @map("is_template")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  trainer         Trainer           @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  exercises       WorkoutExercise[]
+  studentWorkouts StudentWorkout[]
+  sessions        WorkoutSession[]
+
+  @@index([trainerId])
+  @@map("workouts")
+}
+
+model WorkoutExercise {
+  id              String            @id @default(uuid()) @db.Uuid
+  workoutId       String            @map("workout_id") @db.Uuid
+  exerciseId      String            @map("exercise_id") @db.Uuid
+  order           Int
+  sets            Int
+  reps            String
+  suggestedLoadKg Decimal?          @map("suggested_load_kg") @db.Decimal(6, 2)
+  restSeconds     Int               @default(60) @map("rest_seconds")
+  technique       TrainingTechnique @default(NORMAL)
+  /// Exercícios com o mesmo group_key são executados em sequência (bi-set, tri-set, supersérie).
+  groupKey        String?           @map("group_key")
+  notes           String?
+
+  workout  Workout      @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  exercise Exercise     @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+  loggedSets WorkoutSet[]
+
+  @@index([workoutId, order])
+  @@map("workout_exercises")
+}
+
+model StudentWorkout {
+  id         String    @id @default(uuid()) @db.Uuid
+  studentId  String    @map("student_id") @db.Uuid
+  workoutId  String    @map("workout_id") @db.Uuid
+  /// Dias da semana sugeridos (0 = domingo).
+  weekdays   Int[]     @default([])
+  order      Int       @default(0)
+  active     Boolean   @default(true)
+  startsAt   DateTime  @default(now()) @map("starts_at")
+  endsAt     DateTime? @map("ends_at")
+  createdAt  DateTime  @default(now()) @map("created_at")
+
+  student  Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  workout  Workout          @relation(fields: [workoutId], references: [id], onDelete: Cascade)
+  sessions WorkoutSession[]
+
+  @@unique([studentId, workoutId])
+  @@map("student_workouts")
+}
+
+model WorkoutSession {
+  id                String        @id @default(uuid()) @db.Uuid
+  studentId         String        @map("student_id") @db.Uuid
+  workoutId         String?       @map("workout_id") @db.Uuid
+  studentWorkoutId  String?       @map("student_workout_id") @db.Uuid
+  status            SessionStatus @default(IN_PROGRESS)
+  startedAt         DateTime      @default(now()) @map("started_at")
+  finishedAt        DateTime?     @map("finished_at")
+  durationSeconds   Int?          @map("duration_seconds")
+  totalVolumeKg     Decimal?      @map("total_volume_kg") @db.Decimal(10, 2)
+  estimatedCalories Int?          @map("estimated_calories")
+  perceivedEffort   Int?          @map("perceived_effort")
+  notes             String?
+  createdAt         DateTime      @default(now()) @map("created_at")
+
+  student        Student         @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  workout        Workout?        @relation(fields: [workoutId], references: [id], onDelete: SetNull)
+  studentWorkout StudentWorkout? @relation(fields: [studentWorkoutId], references: [id], onDelete: SetNull)
+  sets           WorkoutSet[]
+
+  @@index([studentId, startedAt])
+  @@map("workout_sessions")
+}
+
+model WorkoutSet {
+  id                String    @id @default(uuid()) @db.Uuid
+  sessionId         String    @map("session_id") @db.Uuid
+  workoutExerciseId String?   @map("workout_exercise_id") @db.Uuid
+  exerciseId        String    @map("exercise_id") @db.Uuid
+  setNumber         Int       @map("set_number")
+  loadKg            Decimal   @default(0) @map("load_kg") @db.Decimal(6, 2)
+  reps              Int
+  rpe               Int?
+  notes             String?
+  isPersonalRecord  Boolean   @default(false) @map("is_personal_record")
+  completedAt       DateTime  @default(now()) @map("completed_at")
+
+  session         WorkoutSession   @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  workoutExercise WorkoutExercise? @relation(fields: [workoutExerciseId], references: [id], onDelete: SetNull)
+  exercise        Exercise         @relation(fields: [exerciseId], references: [id], onDelete: Restrict)
+
+  @@unique([sessionId, exerciseId, setNumber])
+  @@index([exerciseId, completedAt])
+  @@map("workout_sets")
+}
+
+// ----------------------------------------------------------------------------
+// Avaliação física e evolução
+// ----------------------------------------------------------------------------
+
+model BodyAssessment {
+  id           String           @id @default(uuid()) @db.Uuid
+  studentId    String           @map("student_id") @db.Uuid
+  trainerId    String?          @map("trainer_id") @db.Uuid
+  status       AssessmentStatus @default(COMPLETED)
+  scheduledFor DateTime?        @map("scheduled_for")
+  assessedAt   DateTime?        @map("assessed_at")
+  weightKg     Decimal?         @map("weight_kg") @db.Decimal(5, 1)
+  heightCm     Decimal?         @map("height_cm") @db.Decimal(5, 1)
+  bmi          Decimal?         @db.Decimal(4, 1)
+  bodyFatPct   Decimal?         @map("body_fat_pct") @db.Decimal(4, 1)
+  muscleMassKg Decimal?         @map("muscle_mass_kg") @db.Decimal(5, 1)
+  leanMassKg   Decimal?         @map("lean_mass_kg") @db.Decimal(5, 1)
+  visceralFat  Decimal?         @map("visceral_fat") @db.Decimal(4, 1)
+  notes        String?
+  createdAt    DateTime         @default(now()) @map("created_at")
+  updatedAt    DateTime         @updatedAt @map("updated_at")
+
+  student      Student          @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  trainer      Trainer?         @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  measurements BodyMeasurement?
+  photos       ProgressPhoto[]
+
+  @@index([studentId, assessedAt])
+  @@index([trainerId, status, scheduledFor])
+  @@map("body_assessments")
+}
+
+/// Medidas corporais em centímetros (1:1 com a avaliação).
+model BodyMeasurement {
+  id           String   @id @default(uuid()) @db.Uuid
+  assessmentId String   @unique @map("assessment_id") @db.Uuid
+  neck         Decimal? @db.Decimal(5, 1)
+  shoulders    Decimal? @db.Decimal(5, 1)
+  chest        Decimal? @db.Decimal(5, 1)
+  rightArm     Decimal? @map("right_arm") @db.Decimal(5, 1)
+  leftArm      Decimal? @map("left_arm") @db.Decimal(5, 1)
+  waist        Decimal? @db.Decimal(5, 1)
+  abdomen      Decimal? @db.Decimal(5, 1)
+  hip          Decimal? @db.Decimal(5, 1)
+  rightThigh   Decimal? @map("right_thigh") @db.Decimal(5, 1)
+  leftThigh    Decimal? @map("left_thigh") @db.Decimal(5, 1)
+  rightCalf    Decimal? @map("right_calf") @db.Decimal(5, 1)
+  leftCalf     Decimal? @map("left_calf") @db.Decimal(5, 1)
+
+  assessment BodyAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+
+  @@map("body_measurements")
+}
+
+model ProgressPhoto {
+  id           String     @id @default(uuid()) @db.Uuid
+  assessmentId String     @map("assessment_id") @db.Uuid
+  studentId    String     @map("student_id") @db.Uuid
+  angle        PhotoAngle
+  url          String
+  createdAt    DateTime   @default(now()) @map("created_at")
+
+  assessment BodyAssessment @relation(fields: [assessmentId], references: [id], onDelete: Cascade)
+  student    Student        @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@unique([assessmentId, angle])
+  @@map("progress_photos")
+}
+
+model StudentGoal {
+  id           String     @id @default(uuid()) @db.Uuid
+  studentId    String     @map("student_id") @db.Uuid
+  trainerId    String?    @map("trainer_id") @db.Uuid
+  type         GoalType
+  title        String
+  exerciseId   String?    @map("exercise_id") @db.Uuid
+  unit         String
+  startValue   Decimal    @map("start_value") @db.Decimal(8, 2)
+  currentValue Decimal    @map("current_value") @db.Decimal(8, 2)
+  targetValue  Decimal    @map("target_value") @db.Decimal(8, 2)
+  deadline     DateTime?  @db.Date
+  status       GoalStatus @default(ACTIVE)
+  achievedAt   DateTime?  @map("achieved_at")
+  createdAt    DateTime   @default(now()) @map("created_at")
+  updatedAt    DateTime   @updatedAt @map("updated_at")
+
+  student  Student   @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  trainer  Trainer?  @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  exercise Exercise? @relation(fields: [exerciseId], references: [id], onDelete: SetNull)
+
+  @@index([studentId, status])
+  @@map("student_goals")
+}
+
+// ----------------------------------------------------------------------------
+// Agenda, comunicação e notificações
+// ----------------------------------------------------------------------------
+
+model Appointment {
+  id            String            @id @default(uuid()) @db.Uuid
+  trainerId     String            @map("trainer_id") @db.Uuid
+  studentId     String?           @map("student_id") @db.Uuid
+  requestedById String?           @map("requested_by_id") @db.Uuid
+  startsAt      DateTime          @map("starts_at")
+  endsAt        DateTime          @map("ends_at")
+  status        AppointmentStatus @default(AVAILABLE)
+  location      String?
+  notes         String?
+  cancelReason  String?           @map("cancel_reason")
+  reminderSentAt DateTime?        @map("reminder_sent_at")
+  createdAt     DateTime          @default(now()) @map("created_at")
+  updatedAt     DateTime          @updatedAt @map("updated_at")
+
+  trainer     Trainer  @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  student     Student? @relation(fields: [studentId], references: [id], onDelete: SetNull)
+  requestedBy User?    @relation("AppointmentRequester", fields: [requestedById], references: [id], onDelete: SetNull)
+
+  @@index([trainerId, startsAt])
+  @@index([studentId, startsAt])
+  @@map("appointments")
+}
+
+model Message {
+  id               String      @id @default(uuid()) @db.Uuid
+  trainerStudentId String      @map("trainer_student_id") @db.Uuid
+  senderId         String      @map("sender_id") @db.Uuid
+  type             MessageType @default(TEXT)
+  content          String?
+  attachmentUrl    String?     @map("attachment_url")
+  attachmentName   String?     @map("attachment_name")
+  attachmentMime   String?     @map("attachment_mime")
+  isQuestion       Boolean     @default(false) @map("is_question")
+  readAt           DateTime?   @map("read_at")
+  createdAt        DateTime    @default(now()) @map("created_at")
+
+  conversation TrainerStudent @relation(fields: [trainerStudentId], references: [id], onDelete: Cascade)
+  sender       User           @relation("MessageSender", fields: [senderId], references: [id], onDelete: Cascade)
+
+  @@index([trainerStudentId, createdAt])
+  @@map("messages")
+}
+
+model Notification {
+  id        String           @id @default(uuid()) @db.Uuid
+  userId    String           @map("user_id") @db.Uuid
+  type      NotificationType
+  title     String
+  body      String
+  data      Json             @default("{}")
+  /// Chave de deduplicação (ex.: "inactivity:2026-10-12") para jobs agendados.
+  dedupeKey String?          @map("dedupe_key")
+  readAt    DateTime?        @map("read_at")
+  sentAt    DateTime?        @map("sent_at")
+  createdAt DateTime         @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, dedupeKey])
+  @@index([userId, createdAt])
+  @@map("notifications")
+}
+
+/// Anotações privadas: visíveis somente ao professor autor.
+model TrainerNote {
+  id        String   @id @default(uuid()) @db.Uuid
+  trainerId String   @map("trainer_id") @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  content   String
+  pinned    Boolean  @default(false)
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId, studentId])
+  @@map("trainer_notes")
+}
+
+// ----------------------------------------------------------------------------
+// IA e relatórios
+// ----------------------------------------------------------------------------
+
+/// Sugestões geradas por IA/regras. Nunca são aplicadas sem aprovação do professor.
+model AiSuggestion {
+  id         String             @id @default(uuid()) @db.Uuid
+  trainerId  String             @map("trainer_id") @db.Uuid
+  studentId  String             @map("student_id") @db.Uuid
+  type       AiSuggestionType
+  title      String
+  content    String
+  payload    Json               @default("{}")
+  source     String             @default("rules")
+  status     AiSuggestionStatus @default(PENDING)
+  reviewedAt DateTime?          @map("reviewed_at")
+  createdAt  DateTime           @default(now()) @map("created_at")
+
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+
+  @@index([trainerId, status])
+  @@map("ai_suggestions")
+}
+
+model WeeklyReport {
+  id        String   @id @default(uuid()) @db.Uuid
+  studentId String   @map("student_id") @db.Uuid
+  trainerId String   @map("trainer_id") @db.Uuid
+  weekStart DateTime @map("week_start") @db.Date
+  summary   String
+  data      Json
+  createdAt DateTime @default(now()) @map("created_at")
+
+  student Student @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  trainer Trainer @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+
+  @@unique([studentId, trainerId, weekStart])
+  @@map("weekly_reports")
+}
+
+// ----------------------------------------------------------------------------
+// Assinaturas (SaaS)
+// ----------------------------------------------------------------------------
+
+model Plan {
+  id          String          @id @default(uuid()) @db.Uuid
+  code        String          @unique
+  name        String
+  description String?
+  /// NULL = alunos ilimitados.
+  maxStudents Int?            @map("max_students")
+  priceCents  Int             @map("price_cents")
+  currency    String          @default("BRL")
+  interval    BillingInterval @default(MONTHLY)
+  active      Boolean         @default(true)
+  createdAt   DateTime        @default(now()) @map("created_at")
+
+  subscriptions Subscription[]
+
+  @@map("plans")
+}
+
+model Subscription {
+  id                     String             @id @default(uuid()) @db.Uuid
+  trainerId              String             @unique @map("trainer_id") @db.Uuid
+  planId                 String             @map("plan_id") @db.Uuid
+  status                 SubscriptionStatus @default(TRIALING)
+  provider               PaymentProvider    @default(MANUAL)
+  providerCustomerId     String?            @map("provider_customer_id")
+  providerSubscriptionId String?            @unique @map("provider_subscription_id")
+  currentPeriodStart     DateTime           @default(now()) @map("current_period_start")
+  currentPeriodEnd       DateTime           @map("current_period_end")
+  cancelAtPeriodEnd      Boolean            @default(false) @map("cancel_at_period_end")
+  createdAt              DateTime           @default(now()) @map("created_at")
+  updatedAt              DateTime           @updatedAt @map("updated_at")
+
+  trainer  Trainer   @relation(fields: [trainerId], references: [id], onDelete: Cascade)
+  plan     Plan      @relation(fields: [planId], references: [id])
+  payments Payment[]
+
+  @@map("subscriptions")
+}
+
+model Payment {
+  id                String          @id @default(uuid()) @db.Uuid
+  subscriptionId    String          @map("subscription_id") @db.Uuid
+  provider          PaymentProvider
+  providerPaymentId String?         @unique @map("provider_payment_id")
+  amountCents       Int             @map("amount_cents")
+  currency          String          @default("BRL")
+  status            PaymentStatus   @default(PENDING)
+  paidAt            DateTime?       @map("paid_at")
+  createdAt         DateTime        @default(now()) @map("created_at")
+
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([status, paidAt])
+  @@map("payments")
+}
+
+// ----------------------------------------------------------------------------
+// Arquivos e auditoria (LGPD)
+// ----------------------------------------------------------------------------
+
+model FileObject {
+  id        String   @id @default(uuid()) @db.Uuid
+  ownerId   String   @map("owner_id") @db.Uuid
+  key       String   @unique
+  url       String
+  mimeType  String   @map("mime_type")
+  sizeBytes Int      @map("size_bytes")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+
+  @@map("files")
+}
+
+model AuditLog {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String?  @map("user_id") @db.Uuid
+  action    String
+  entity    String?
+  entityId  String?  @map("entity_id")
+  ip        String?
+  metadata  Json     @default("{}")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([userId, createdAt])
+  @@map("audit_logs")
+}

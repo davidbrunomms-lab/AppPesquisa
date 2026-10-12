@@ -1,0 +1,24 @@
+{
+  "name": "personalpro",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Plataforma SaaS para personal trainers e alunos (iOS, Android e Web)",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "build:shared": "npm run build -w @personalpro/shared",
+    "dev:api": "npm run start:dev -w @personalpro/api",
+    "dev:web": "npm run dev -w @personalpro/web",
+    "dev:mobile": "npm run start -w @personalpro/mobile",
+    "db:up": "docker compose up -d postgres",
+    "db:migrate": "npm run prisma:migrate -w @personalpro/api",
+    "db:seed": "npm run prisma:seed -w @personalpro/api",
+    "test": "npm run test --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

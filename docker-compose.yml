@@ -1,0 +1,26 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: personalpro
+      POSTGRES_PASSWORD: personalpro
+      POSTGRES_DB: personalpro
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    env_file: apps/api/.env
+    environment:
+      DATABASE_URL: postgresql://personalpro:personalpro@postgres:5432/personalpro
+    ports:
+      - "3333:3333"
+    depends_on:
+      - postgres
+
+volumes:
+  pgdata:
