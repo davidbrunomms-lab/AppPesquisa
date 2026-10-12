@@ -71,9 +71,8 @@ Plataforma SaaS para personal trainers e alunos de academia, disponível em **iO
 │   │   │   │   └── payments/        # PaymentGatewayPort: manual | stripe | mercado_pago | asaas
 │   │   │   └── modules/
 │   │   │       └── <módulo>/
-│   │   │           ├── domain/          # Regras e políticas puras do módulo
-│   │   │           ├── application/     # Casos de uso (services)
-│   │   │           ├── infrastructure/  # Repositórios Prisma
+│   │   │           ├── domain/          # Regras e políticas puras do módulo (quando houver)
+│   │   │           ├── application/     # Casos de uso (services), jobs e gateways de tempo real
 │   │   │           └── presentation/    # Controllers REST + DTOs validados
 │   │   └── test/                    # Testes e2e (Postgres real)
 │   ├── mobile/                      # App Expo (iOS/Android)
@@ -114,9 +113,13 @@ Fluxo de dependências: `presentation → application → domain`, com
   erros de domínio (`DomainError`, `NotFoundError`, `ForbiddenError`…).
 - **application** — casos de uso. Orquestram repositórios, políticas de acesso,
   notificações e regras de domínio. Não conhecem HTTP.
-- **infrastructure** — Prisma, S3, FCM, SMTP, gateways de pagamento e provedores
-  de IA. Cada adaptador implementa uma *porta* (classe abstrata usada como token
-  de injeção), permitindo trocar o provedor por configuração.
+- **infrastructure** — S3, FCM, SMTP, gateways de pagamento e provedores de IA.
+  Cada adaptador implementa uma *porta* (classe abstrata usada como token de
+  injeção, em `src/infrastructure/*/*.port.ts`), permitindo trocar o provedor por
+  configuração sem tocar nos casos de uso. Para persistência, o Prisma Client
+  (via `PrismaService`) já atua como *data mapper* tipado; os casos de uso o
+  utilizam diretamente em vez de uma camada extra de repositórios, e o
+  isolamento multi-tenant fica centralizado no `AccessPolicyService`.
 - **presentation** — controllers REST, DTOs com `class-validator` e
   documentação Swagger.
 

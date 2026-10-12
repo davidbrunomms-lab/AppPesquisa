@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: personalpro
+          POSTGRES_PASSWORD: personalpro
+          POSTGRES_DB: personalpro_test
+        ports: ['5432:5432']
+        options: >-
+          --health-cmd "pg_isready -U personalpro" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgresql://personalpro:personalpro@localhost:5432/personalpro_test
+      TEST_DATABASE_URL: postgresql://personalpro:personalpro@localhost:5432/personalpro_test
+      JWT_ACCESS_SECRET: ci-secret-with-more-than-32-characters!!
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run build -w @personalpro/shared
+      - run: npm test -w @personalpro/shared
+      - run: npx --workspace @personalpro/api prisma generate
+      - run: npm run typecheck -w @personalpro/api
+      - run: npm test -w @personalpro/api
+      - run: npm run test:e2e -w @personalpro/api
+      - run: npm run typecheck -w @personalpro/mobile
+      - run: npm run typecheck -w @personalpro/web
+      - run: npm run build -w @personalpro/web
+        env:
+          NEXT_TELEMETRY_DISABLED: '1'

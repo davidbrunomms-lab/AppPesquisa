@@ -1,3 +1,4 @@
+import '../src/timezone';
 /**
  * Seed idempotente:
  *  - Planos SaaS (Starter/Pro/Unlimited)
