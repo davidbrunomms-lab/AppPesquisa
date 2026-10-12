@@ -1,0 +1,75 @@
+# Deploy em um clique no Render (https://render.com): New + → Blueprint → selecione este repositório.
+# Cria o PostgreSQL, a API (NestJS) e a versão web (Next.js).
+# Se o Render atribuir URLs diferentes de personalpro-api/personalpro-web.onrender.com
+# (nome já usado), ajuste PUBLIC_API_URL, APP_URL, CORS_ORIGINS e NEXT_PUBLIC_API_URL.
+
+databases:
+  - name: personalpro-db
+    plan: free
+    databaseName: personalpro
+    user: personalpro
+
+services:
+  - type: web
+    name: personalpro-api
+    runtime: node
+    plan: free
+    healthCheckPath: /plans
+    buildCommand: >-
+      npm ci --workspace @personalpro/api --workspace @personalpro/shared --include-workspace-root &&
+      npm run build -w @personalpro/shared &&
+      npx --workspace @personalpro/api prisma generate &&
+      npm run build -w @personalpro/api
+    # Aplica migrações (não destrutivo) e o seed idempotente antes de iniciar
+    startCommand: >-
+      cd apps/api &&
+      npx prisma migrate deploy &&
+      npx ts-node --transpile-only prisma/seed.ts &&
+      node dist/main.js
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NODE_ENV
+        value: production
+      - key: DATABASE_URL
+        fromDatabase:
+          name: personalpro-db
+          property: connectionString
+      - key: JWT_ACCESS_SECRET
+        generateValue: true
+      - key: DATA_ENCRYPTION_KEY
+        generateValue: true # 256 bits em base64 (AES-256-GCM)
+      - key: PUBLIC_API_URL
+        value: https://personalpro-api.onrender.com
+      - key: APP_URL
+        value: https://personalpro-web.onrender.com
+      - key: CORS_ORIGINS
+        value: https://personalpro-web.onrender.com
+      - key: APP_TIMEZONE
+        value: America/Sao_Paulo
+      # Contas demo (professor/alunos). Troque para "false" no uso real.
+      - key: SEED_DEMO
+        value: "true"
+      - key: SEED_ADMIN_EMAIL
+        value: admin@personalpro.app
+      - key: SEED_ADMIN_PASSWORD
+        sync: false # informe no painel do Render ao criar
+      - key: STORAGE_DRIVER
+        value: local # disco efêmero no plano gratuito: use "s3" + S3_* para não perder uploads
+
+  - type: web
+    name: personalpro-web
+    runtime: node
+    plan: free
+    buildCommand: >-
+      npm ci --workspace @personalpro/web --workspace @personalpro/shared --include-workspace-root &&
+      npm run build -w @personalpro/shared &&
+      npm run build -w @personalpro/web
+    startCommand: npm run start -w @personalpro/web
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: NEXT_TELEMETRY_DISABLED
+        value: "1"
+      - key: NEXT_PUBLIC_API_URL
+        value: https://personalpro-api.onrender.com

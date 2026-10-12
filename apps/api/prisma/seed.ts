@@ -6,7 +6,7 @@ import '../src/timezone';
  *  - Administrador da plataforma
  *  - (fora de produção) professor e alunos de demonstração com histórico
  *
- * Uso: npm run db:seed   (SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD / SEED_DEMO=false opcionais)
+ * Uso: npm run db:seed   (SEED_ADMIN_EMAIL / SEED_ADMIN_PASSWORD / SEED_DEMO=true|false opcionais)
  */
 import { PrismaClient, SessionStatus, SubscriptionStatus } from '@prisma/client';
 import { hash } from 'bcryptjs';
@@ -278,7 +278,9 @@ async function main() {
   await seedPlans();
   await seedExercises();
   await seedAdmin();
-  if (process.env.NODE_ENV !== 'production' && process.env.SEED_DEMO !== 'false') await seedDemo();
+  // Demo: padrão fora de produção; em produção somente com SEED_DEMO=true (ex.: ambiente de demonstração)
+  const demo = process.env.SEED_DEMO === 'true' || (process.env.NODE_ENV !== 'production' && process.env.SEED_DEMO !== 'false');
+  if (demo) await seedDemo();
 }
 
 main()

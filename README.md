@@ -53,6 +53,20 @@ Código de convite do professor demo: `DEMO01`.
 > No app mobile, defina `EXPO_PUBLIC_API_URL` com o IP da sua máquina na rede
 > (ex.: `http://192.168.0.10:3333`) para acessar a API a partir do celular.
 
+## Publicar na internet (Render)
+
+O arquivo [`render.yaml`](render.yaml) cria tudo em um clique — banco PostgreSQL, API e versão web:
+
+1. Crie uma conta em [render.com](https://render.com) e conecte o GitHub.
+2. **New + → Blueprint** → selecione este repositório e a branch.
+3. Informe `SEED_ADMIN_PASSWORD` (senha do administrador) e confirme.
+4. Ao terminar, acesse `https://personalpro-web.onrender.com` (também pelo navegador do celular).
+
+Observações do plano gratuito: os serviços "dormem" após 15 min sem uso (o primeiro acesso leva ~1 min),
+o PostgreSQL gratuito expira após 30 dias e os uploads ficam em disco temporário — para uso real,
+use planos pagos e `STORAGE_DRIVER=s3`. Com `SEED_DEMO=true` as contas demo são criadas; troque para
+`false` antes de cadastrar clientes reais.
+
 ## Testes
 
 ```bash
